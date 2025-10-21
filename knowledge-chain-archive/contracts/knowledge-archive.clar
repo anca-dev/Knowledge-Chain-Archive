@@ -1,30 +1,18 @@
+;; KnowledgeChain Archive - Decentralized knowledge base with attribution tracking
 
-;; title: knowledge-archive
-;; version:
-;; summary:
-;; description:
+;; Constants
+(define-constant contract-owner tx-sender)
+(define-constant err-owner-only (err u300))
+(define-constant err-not-found (err u301))
+(define-constant err-unauthorized (err u302))
+(define-constant err-already-exists (err u303))
+(define-constant err-invalid-params (err u304))
 
-;; traits
-;;
+;; Access levels
+(define-constant access-public u0)
+(define-constant access-restricted u1)
+(define-constant access-private u2)
 
-;; token definitions
-;;
-
-;; constants
-;;
-
-;; data vars
-;;
-
-;; data maps
-;;
-
-;; public functions
-;;
-
-;; read only functions
-;;
-
-;; private functions
-;;
-
+;; Data Variables
+(define-data-var next-artifact-id uint u0)
+(define-data-var next-citation-id uint u0)
