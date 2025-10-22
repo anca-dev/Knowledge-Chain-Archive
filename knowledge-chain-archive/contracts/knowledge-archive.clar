@@ -208,3 +208,116 @@
     (err err-not-found)
   )
 )
+
+;; #[allow(unchecked_data)]
+(define-public (grant-access (artifact-id uint) (user principal))
+  (let
+    (
+      (artifact-data (unwrap! (get-artifact artifact-id) err-not-found))
+    )
+    (asserts! (is-eq (get author artifact-data) tx-sender) err-unauthorized)
+    (asserts! (> (get access-level artifact-data) access-public) err-invalid-params)
+    
+    (map-set access-permissions
+      { artifact-id: artifact-id, user: user }
+      {
+        has-access: true,
+        granted-block: stacks-block-height
+      }
+    )
+    (ok true)
+  )
+)
+
+;; #[allow(unchecked_data)]
+(define-public (revoke-access (artifact-id uint) (user principal))
+  (let
+    (
+      (artifact-data (unwrap! (get-artifact artifact-id) err-not-found))
+    )
+    (asserts! (is-eq (get author artifact-data) tx-sender) err-unauthorized)
+    
+    (map-delete access-permissions { artifact-id: artifact-id, user: user })
+    (ok true)
+  )
+)
+
+(define-public (update-access-level (artifact-id uint) (new-access-level uint))
+  (let
+    (
+      (artifact-data (unwrap! (get-artifact artifact-id) err-not-found))
+    )
+    (asserts! (is-eq (get author artifact-data) tx-sender) err-unauthorized)
+    (asserts! (<= new-access-level access-private) err-invalid-params)
+    
+    (map-set artifacts
+      { artifact-id: artifact-id }
+      (merge artifact-data { access-level: new-access-level })
+    )
+    (ok true)
+  )
+)
+
+;; #[allow(unchecked_data)]
+(define-public (record-revenue (artifact-id uint) (amount uint))
+  (let
+    (
+      (artifact-data (unwrap! (get-artifact artifact-id) err-not-found))
+      (author (get author artifact-data))
+      (author-stats-data (unwrap! (get-author-stats author) err-not-found))
+    )
+    (asserts! (is-eq tx-sender contract-owner) err-owner-only)
+    
+    (map-set artifacts
+      { artifact-id: artifact-id }
+      (merge artifact-data { revenue-generated: (+ (get revenue-generated artifact-data) amount) })
+    )
+    
+    (map-set author-stats
+      { author: author }
+      (merge author-stats-data { total-revenue: (+ (get total-revenue author-stats-data) amount) })
+    )
+    
+    (ok true)
+  )
+)
+
+(define-public (update-artifact-title (artifact-id uint) (new-title (string-ascii 100)))
+  (let
+    (
+      (artifact-data (unwrap! (get-artifact artifact-id) err-not-found))
+    )
+    (asserts! (is-eq (get author artifact-data) tx-sender) err-unauthorized)
+    
+    (map-set artifacts
+      { artifact-id: artifact-id }
+      (merge artifact-data { title: new-title })
+    )
+    (ok true)
+  )
+)
+
+(define-public (batch-grant-access (artifact-id uint) (users (list 10 principal)))
+  (let
+    (
+      (artifact-data (unwrap! (get-artifact artifact-id) err-not-found))
+    )
+    (asserts! (is-eq (get author artifact-data) tx-sender) err-unauthorized)
+    (asserts! (> (get access-level artifact-data) access-public) err-invalid-params)
+    
+    (ok (fold grant-access-fold users artifact-id))
+  )
+)
+
+(define-private (grant-access-fold (user principal) (artifact-id uint))
+  (begin
+    (map-set access-permissions
+      { artifact-id: artifact-id, user: user }
+      {
+        has-access: true,
+        granted-block: stacks-block-height
+      }
+    )
+    artifact-id
+  )
+)
