@@ -59,3 +59,54 @@
     total-revenue: uint
   }
 )
+
+;; Read-only functions
+(define-read-only (get-artifact (artifact-id uint))
+  (map-get? artifacts { artifact-id: artifact-id })
+)
+
+(define-read-only (get-citation (citation-id uint))
+  (map-get? citations { citation-id: citation-id })
+)
+
+(define-read-only (get-author-stats (author principal))
+  (map-get? author-stats { author: author })
+)
+
+(define-read-only (has-access (artifact-id uint) (user principal))
+  (match (get-artifact artifact-id)
+    artifact-data
+      (if (is-eq (get access-level artifact-data) access-public)
+        (ok true)
+        (if (is-eq (get author artifact-data) user)
+          (ok true)
+          (match (map-get? access-permissions { artifact-id: artifact-id, user: user })
+            permission (ok (get has-access permission))
+            (ok false)
+          )
+        )
+      )
+    (err err-not-found)
+  )
+)
+
+(define-read-only (get-citation-count (artifact-id uint))
+  (match (get-artifact artifact-id)
+    artifact-data (ok (get citation-count artifact-data))
+    (err err-not-found)
+  )
+)
+
+(define-read-only (get-citation-between (citing-artifact-id uint) (cited-artifact-id uint))
+  (map-get? artifact-citations 
+    { artifact-id: citing-artifact-id, cited-artifact: cited-artifact-id }
+  )
+)
+
+(define-read-only (get-total-artifacts)
+  (ok (var-get next-artifact-id))
+)
+
+(define-read-only (get-total-citations)
+  (ok (var-get next-citation-id))
+)
