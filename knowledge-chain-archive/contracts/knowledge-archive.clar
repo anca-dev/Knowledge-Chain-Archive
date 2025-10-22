@@ -110,3 +110,101 @@
 (define-read-only (get-total-citations)
   (ok (var-get next-citation-id))
 )
+
+;; Public functions
+;; #[allow(unchecked_data)]
+(define-public (publish-artifact 
+  (title (string-ascii 100))
+  (content-hash (string-ascii 64))
+  (artifact-type (string-ascii 20))
+  (access-level uint))
+  (let
+    (
+      (artifact-id (var-get next-artifact-id))
+      (current-stats (get-author-stats tx-sender))
+    )
+    (asserts! (<= access-level access-private) err-invalid-params)
+    
+    (map-set artifacts
+      { artifact-id: artifact-id }
+      {
+        author: tx-sender,
+        title: title,
+        content-hash: content-hash,
+        artifact-type: artifact-type,
+        published-block: stacks-block-height,
+        access-level: access-level,
+        citation-count: u0,
+        revenue-generated: u0
+      }
+    )
+    
+    (match current-stats
+      stats
+        (map-set author-stats
+          { author: tx-sender }
+          (merge stats { total-publications: (+ (get total-publications stats) u1) })
+        )
+      (map-set author-stats
+        { author: tx-sender }
+        {
+          total-publications: u1,
+          total-citations: u0,
+          total-revenue: u0
+        }
+      )
+    )
+    
+    (var-set next-artifact-id (+ artifact-id u1))
+    (ok artifact-id)
+  )
+)
+
+(define-public (add-citation (citing-artifact-id uint) (cited-artifact-id uint))
+  (let
+    (
+      (citing-artifact (unwrap! (get-artifact citing-artifact-id) err-not-found))
+      (cited-artifact (unwrap! (get-artifact cited-artifact-id) err-not-found))
+      (citation-id (var-get next-citation-id))
+      (cited-author (get author cited-artifact))
+      (cited-author-stats (unwrap! (get-author-stats cited-author) err-not-found))
+    )
+    (asserts! (is-eq (get author citing-artifact) tx-sender) err-unauthorized)
+    (asserts! (not (is-eq citing-artifact-id cited-artifact-id)) err-invalid-params)
+    
+    (map-set citations
+      { citation-id: citation-id }
+      {
+        citing-artifact: citing-artifact-id,
+        cited-artifact: cited-artifact-id,
+        citation-block: stacks-block-height
+      }
+    )
+    
+    (map-set artifact-citations
+      { artifact-id: citing-artifact-id, cited-artifact: cited-artifact-id }
+      { citation-id: citation-id }
+    )
+    
+    (map-set artifacts
+      { artifact-id: cited-artifact-id }
+      (merge cited-artifact { citation-count: (+ (get citation-count cited-artifact) u1) })
+    )
+    
+    (map-set author-stats
+      { author: cited-author }
+      (merge cited-author-stats { total-citations: (+ (get total-citations cited-author-stats) u1) })
+    )
+    
+    (var-set next-citation-id (+ citation-id u1))
+    (ok citation-id)
+  )
+)
+
+(define-public (verify-artifact-ownership (artifact-id uint) (author principal))
+  (match (get-artifact artifact-id)
+    artifact-data
+      (ok (is-eq (get author artifact-data) author))
+    (err err-not-found)
+  )
+)
